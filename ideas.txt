@@ -1,0 +1,13 @@
+include ordinal features instead of only numeric and categorical
+make some numeric features ordinal and then labelencode
+
+
+get the heatmap back from an earlier commit
+
+and missing data. analysis
+
+
+maybe outlier anaysis
+
+maybe normalize all numeric features
+
