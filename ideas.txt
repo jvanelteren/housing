@@ -1,6 +1,4 @@
 include ordinal features instead of only numeric and categorical
-make some numeric features ordinal and then labelencode
-    train = train.replace({"Alley" : {"Grvl" : 1, "Pave" : 2},
 
 maybe outlier anaysis
 
