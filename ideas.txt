@@ -2,4 +2,7 @@ include ordinal features instead of only numeric and categorical
 
 maybe outlier anaysis
 
+
+
+doublecheck skewness and scaling
 maybe normalize all numeric features
