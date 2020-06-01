@@ -7,3 +7,5 @@
 doublecheck skewness and scaling
 
  do imputation more specific per variable
+
+ fastai2
