@@ -9,3 +9,5 @@ doublecheck skewness and scaling
  do imputation more specific per variable
 
  fastai2
+
+ play around with random forest just like in 09.tabular
