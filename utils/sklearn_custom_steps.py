@@ -7,6 +7,7 @@ from sklearn.neighbors import LocalOutlierFactor
 from sklearn.base import TransformerMixin
 from sklearn.preprocessing import MinMaxScaler,StandardScaler,RobustScaler
 from sklearn.preprocessing import OneHotEncoder
+from catboost import CatBoostRegressor
 import pandas as pd
 import numpy as np
 class DFSimpleImputer(SimpleImputer):
@@ -30,6 +31,7 @@ class DFColumnTransformer(ColumnTransformer):
         Xs = [f for f in Xs]
         cols = [col for f in Xs for col in f.columns]
         df = pd.DataFrame(np.hstack(Xs), columns=cols)
+        # print('final shape',df.shape)
         return df.infer_objects()
 
 class OutlierExtractor(TransformerMixin):
@@ -69,3 +71,4 @@ class OutlierExtractor(TransformerMixin):
 
     def fit(self, *args, **kwargs):
         return self
+

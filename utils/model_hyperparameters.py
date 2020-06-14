@@ -10,7 +10,13 @@ import lightgbm as lgb
 import xgboost as xgb
 from catboost import CatBoostRegressor
 
-
+class AutoCatBoostRegressor(CatBoostRegressor):
+    def fit(self,X,y,**kwargs):
+        categorical = list(X.dtypes[(X.dtypes=='category' )| (X.dtypes=='object') | (X.dtypes=='O')].index)
+        print(X.shape,len(categorical),categorical)
+        res =  super().fit(X,y,cat_features=categorical)
+        return res
+        
 
 @dataclass
 class Param:
@@ -65,7 +71,7 @@ models = {
             #     'eta0' : [1, 10, 100]}),
 
             # Catboost does not work atm with bayessearch. Tried to define __hash__, but then got into problems with is_comparable
-            'CatBoostRegressor':Param(CatBoostRegressor(silent=True,one_hot_max_size=20, iterations = 300),
+            'AutoCatBoostRegressor':Param(AutoCatBoostRegressor(silent=True,one_hot_max_size=20, iterations = 300),
                 {
                 # 'iterations': Integer(350,350),
                  'depth': Integer(4, 10),
