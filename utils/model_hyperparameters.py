@@ -13,7 +13,7 @@ from catboost import CatBoostRegressor
 class AutoCatBoostRegressor(CatBoostRegressor):
     def fit(self,X,y,**kwargs):
         categorical = list(X.dtypes[(X.dtypes=='category' )| (X.dtypes=='object') | (X.dtypes=='O')].index)
-        print(X.shape,len(categorical),categorical)
+        # print(X.shape,len(categorical),categorical)
         res =  super().fit(X,y,cat_features=categorical)
         return res
         
