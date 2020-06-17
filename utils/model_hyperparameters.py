@@ -122,12 +122,11 @@ models = {
             }),
 
             # A sparse matrix was passed, but dense data is required. Use X.toarray() to convert to a dense numpy array
-            'HistGradientBoostingRegressor':Param(HistGradientBoostingRegressor(loss='huber'),
-                {'loss':'huber'}),
+            'HistGradientBoostingRegressor':Param(HistGradientBoostingRegressor(),
+                {}),
             'GradientBoostingRegressor': Param(GradientBoostingRegressor(learning_rate=0.05,
                                    max_depth=4, max_features='sqrt',
-                                   min_samples_leaf=15, min_samples_split=10, 
-                                   loss='huber', random_state =5),
+                                   min_samples_leaf=15, min_samples_split=10, random_state =5),
                 {
                 'max_depth': Integer(3,12),
                 'min_samples_leaf': Integer(5,20),
