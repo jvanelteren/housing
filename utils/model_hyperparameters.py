@@ -16,6 +16,7 @@ class AutoCatBoostRegressor(CatBoostRegressor):
     def fit(self,X,y,**kwargs):
         categorical = list(X.dtypes[(X.dtypes=='category' )| (X.dtypes=='object') | (X.dtypes=='O')].index)
         # print(X.shape,len(categorical),categorical)
+        # print('kwarg',kwargs)
         res =  super().fit(X,y,cat_features=categorical,**kwargs)
         return res
     def __ne__(self, other):
@@ -76,14 +77,14 @@ models = {
             #     'eta0' : [1, 10, 100]}),
 
             # Catboost does not work atm with bayessearch. Tried to define __hash__, but then got into problems with is_comparable
-            'AutoCatBoostRegressor':Param(AutoCatBoostRegressor(silent=True,iterations = 1000,border_count=254),
+            'AutoCatBoostRegressor':Param(AutoCatBoostRegressor(silent=True,iterations = 300),
                 {
-                # 'iterations': Integer(350),
-                 'depth': Integer(3, 10),
-                 'learning_rate': Real(0.03, 0.045, 'log-uniform'),
-                 'subsample': Real(0.7,1,'uniform'),
-                 'random_strength': Real(1, 10, 'uniform'),
-                 'bagging_temperature': Real(0.001, 1.0),
+                # 'iterations': Integer(350,350),
+                 'depth': Integer(4, 10),
+                 'learning_rate': Real(0.01, 1.0, 'log-uniform'),
+                 'random_strength': Real(1e-9, 10, 'log-uniform'),
+                 'bagging_temperature': Real(0.0, 1.0),
+                 'border_count': Integer(1, 255),
                  'l2_leaf_reg': Integer(2, 30),
                  },
             # preprocess={'onehot':False}
