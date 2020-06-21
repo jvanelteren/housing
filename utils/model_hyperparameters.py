@@ -23,7 +23,8 @@ class AutoCatBoostRegressor(CatBoostRegressor):
         try:
             return not self._is_comparable_to(other) or self._object != other._object
         except:
-            return 1
+            return 0
+
 
 @dataclass
 class Param:
@@ -77,15 +78,16 @@ models = {
             #     'eta0' : [1, 10, 100]}),
 
             # Catboost does not work atm with bayessearch. Tried to define __hash__, but then got into problems with is_comparable
-            'AutoCatBoostRegressor':Param(AutoCatBoostRegressor(silent=True,iterations = 300),
+            'AutoCatBoostRegressor':Param(AutoCatBoostRegressor(silent=True,iterations = 1000),
                 {
                 # 'iterations': Integer(350,350),
-                 'depth': Integer(4, 10),
-                 'learning_rate': Real(0.01, 1.0, 'log-uniform'),
-                 'random_strength': Real(1e-9, 10, 'log-uniform'),
-                 'bagging_temperature': Real(0.0, 1.0),
-                 'border_count': Integer(1, 255),
-                 'l2_leaf_reg': Integer(2, 30),
+                 'depth': Integer(4, 7),
+                 'learning_rate': Real(0.03, 0.045, 'log-uniform'),
+                 'random_strength': Real(0.1, 2, 'log-uniform'),
+                 'subsample':Real(0.6,1,'uniform'),
+                #  'bagging_temperature': Real(0.0, 1.0),
+                #  'border_count': Integer(1, 255),
+                 'l2_leaf_reg': Integer(2, 6),
                  },
             # preprocess={'onehot':False}
             ),
@@ -133,9 +135,11 @@ models = {
                                    max_depth=4, max_features='sqrt',
                                    min_samples_leaf=5, min_samples_split=12, random_state =5,loss='huber'),
                 {
+                'learning_rate': Real(0.035,0.07, 'uniform'),
                 'n_estimators':Integer(1000,3000),
-                'max_depth': Integer(3,12),
+                'max_depth': Integer(2,10),
                 'min_samples_leaf': Integer(5,20),
+                'min_samples_split': Integer(8,16),
                 }),
 
             'LassoCV':Param(LassoCV(),

@@ -52,7 +52,7 @@ class OutlierExtractor(TransformerMixin):
 
         self.kwargs = kwargs
 
-    def transform(self, X, y):
+    def fit_transform(self, X, y):
         """
         Uses LocalOutlierFactor class to subselect data based on some threshold
 
@@ -70,5 +70,9 @@ class OutlierExtractor(TransformerMixin):
                 y[lcf.negative_outlier_factor_ > self.threshold])
 
     def fit(self, *args, **kwargs):
+        print('problem: fit called on Outlier Extracted. Fit transform was expected')
+        return self
+
+    def transform(self,X):
         return self
 
