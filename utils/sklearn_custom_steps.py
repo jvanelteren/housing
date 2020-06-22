@@ -4,7 +4,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.neighbors import LocalOutlierFactor
-from sklearn.base import TransformerMixin
+from sklearn.base import TransformerMixin,BaseEstimator, RegressorMixin
 from sklearn.preprocessing import MinMaxScaler,StandardScaler,RobustScaler
 from sklearn.preprocessing import OneHotEncoder
 from catboost import CatBoostRegressor
@@ -34,45 +34,33 @@ class DFColumnTransformer(ColumnTransformer):
         # print('final shape',df.shape)
         return df.infer_objects()
 
-class OutlierExtractor(TransformerMixin):
-    def __init__(self, **kwargs):
-        """
-        Create a transformer to remove outliers. A threshold is set for selection
-        criteria, and further arguments are passed to the LocalOutlierFactor class
+class DFOutlierExtractor(BaseEstimator, RegressorMixin):
 
+    def __init__(self, model, **kwargs):
+        """ 
         Keyword Args:
-            neg_conf_val (float): The threshold for excluding samples with a lower
-               negative outlier factor.
-
-        Returns:
-            object: to be used as a transformer method as part of Pipeline()
+        neg_conf_val (float): The threshold for excluding samples with a lower
+        negative outlier factor.
         """
-
+    
+        self.model = model
         self.threshold = kwargs.pop('neg_conf_val', -10.0)
-
         self.kwargs = kwargs
+        self.lcf = []
 
-    def fit_transform(self, X, y):
-        """
-        Uses LocalOutlierFactor class to subselect data based on some threshold
 
-        Returns:
-            ndarray: subsampled data
-
-        Notes:
-            X should be of shape (n_samples, n_features)
-        """
-        X = np.asarray(X)
-        y = np.asarray(y)
+    def fit(self, X, y):
+        xs = np.asarray(X)
+        ys = np.asarray(y)
         lcf = LocalOutlierFactor(**self.kwargs)
-        lcf.fit(X)
-        return (X[lcf.negative_outlier_factor_ > self.threshold, :],
-                y[lcf.negative_outlier_factor_ > self.threshold])
-
-    def fit(self, *args, **kwargs):
-        print('problem: fit called on Outlier Extracted. Fit transform was expected')
+        lcf.fit(xs)
+        self.xs  = pd.DataFrame(xs[lcf.negative_outlier_factor_ > self.threshold, :],columns=X.columns)
+        self.ys = y[lcf.negative_outlier_factor_ > self.threshold]
+        self.lcf  = lcf
+        print(xs.shape,ys.shape,X.shape)
+        self.model.fit(xs,ys)
         return self
 
-    def transform(self,X):
-        return self
 
+    def predict(self, X):
+        return self.model.predict(X)
