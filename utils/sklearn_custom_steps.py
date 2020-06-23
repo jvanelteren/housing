@@ -44,23 +44,22 @@ class DFOutlierExtractor(BaseEstimator, RegressorMixin):
         """
     
         self.model = model
-        self.threshold = kwargs.pop('neg_conf_val', -10.0)
+        self.threshold = kwargs.pop('neg_conf_val', -1.5)
         self.kwargs = kwargs
-        self.lcf = []
+        # self.lcf = []
 
 
     def fit(self, X, y):
-        xs = np.asarray(X)
-        ys = np.asarray(y)
-        lcf = LocalOutlierFactor(**self.kwargs)
-        lcf.fit(xs)
-        self.xs  = pd.DataFrame(xs[lcf.negative_outlier_factor_ > self.threshold, :],columns=X.columns)
-        self.ys = y[lcf.negative_outlier_factor_ > self.threshold]
-        self.lcf  = lcf
-        print(xs.shape,ys.shape,X.shape)
-        self.model.fit(xs,ys)
+        print('X',X.shape)
+        self.xs = np.asarray(X)
+        self.ys = np.asarray(y)
+        self.lcf = LocalOutlierFactor(**self.kwargs)
+        self.lcf.fit(self.xs)
+        self.xs  = pd.DataFrame(self.xs[self.lcf.negative_outlier_factor_ > self.threshold, :],columns=X.columns)
+        self.ys = y[self.lcf.negative_outlier_factor_ > self.threshold]
+        print('removed',len(X) - len(self.xs))
+        self.model.fit(self.xs,self.ys)
         return self
-
 
     def predict(self, X):
         return self.model.predict(X)
