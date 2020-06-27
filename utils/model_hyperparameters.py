@@ -2,6 +2,8 @@ from skopt.space import Real, Categorical, Integer
 from dataclasses import dataclass,field
 from sklearn.linear_model import LinearRegression, Ridge, RidgeCV, Lasso, LassoCV, ElasticNet,SGDRegressor
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.experimental import enable_hist_gradient_boosting
+
 from sklearn.ensemble import RandomForestRegressor,GradientBoostingRegressor,HistGradientBoostingRegressor
 from sklearn import svm
 from sklearn.neural_network import MLPRegressor
