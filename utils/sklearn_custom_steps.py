@@ -38,14 +38,61 @@ class DFSimpleImputer(SimpleImputer):
     def transform(self, X,y=None):
         return pd.DataFrame(super().transform(X),columns=X.columns)
 
-class DFSmartImputer(TransformerMixin):
-    def fit(self,X, y=None):
-        self.conversion = {name: SimpleImputer(strategy='most_frequent').fit(df) for name, df in X.groupby('Neighborhood')}
+class DFZeroOrMeanImputer(TransformerMixin): # only for numeric features
+    def fit(self, X, y=None):
+        def determine_zero(series):
+            perc_zero =  sum(series==0) / series.count()
+            if perc_zero > 0.5: #zero occurs often: 
+                return True
+            else: 
+                return False
+        
+        self.zero_cols = set([c for c in X.columns if determine_zero(X[c])])
+        self.other_cols = set(X.columns) - self.zero_cols
+        
+        if self.zero_cols:
+            self.zero_imp = DFSimpleImputer(strategy='constant', fill_value=0)
+            self.zero_imp.fit(X[self.zero_cols])
+
+        if self.other_cols:
+            self.other_imp = DFSimpleImputer(strategy='mean')
+            self.other_imp.fit(X[self.other_cols])
         return self
     
     def transform(self, X,y=None):
-        self.trans = [df.fillna(value=dict(zip(X.columns,self.conversion[name].statistics_))) for name, df in X.groupby('Neighborhood')]
-        return pd.concat(self.trans)
+        zero_trans, other_trans = pd.DataFrame(),pd.DataFrame(),
+        if self.zero_cols: zero_trans = self.zero_imp.transform(X[self.zero_cols])
+        if self.other_cols: other_trans = self.other_imp.transform(X[self.other_cols])
+        return pd.concat([other_trans,zero_trans], axis=1)
+
+class DFSmartImputer(TransformerMixin): # will impute based on category Neighborhood
+    def __init__(self,strategy='most_frequent'):
+        super().__init__()
+        self.strategy = strategy
+
+    def remove_neigh(self,df):
+        return df.drop(columns=['Neighborhood'])
+    def fit(self,X, y=None):
+
+        if all(X.dtypes=='category'): # categorical columns
+            self.overall_imp = SimpleImputer(strategy=self.strategy).fit(X)
+            self.specific_imps = {name: SimpleImputer(strategy=self.strategy).fit(df) for name, df in X.groupby('Neighborhood', sort=False)}
+        else:
+            self.overall_imp = SimpleImputer(strategy=self.strategy).fit(self.remove_neigh(X))
+            self.specific_imps = {name: SimpleImputer(strategy=self.strategy).fit(self.remove_neigh(df)) for name, df in X.groupby('Neighborhood', sort=False)}
+        
+        return self
+    
+    def get_transform_dict(self, name, df, X):
+        impute_values = [imp_val if imp_val==imp_val else self.overall_imp.statistics_[i] for i, imp_val in enumerate(self.specific_imps[name].statistics_)]
+        return dict(zip(X.columns,impute_values))
+
+    def transform(self, X,y=None):
+        if all(X.dtypes=='category'): # categorical columns
+            dfs = [df.fillna(value=self.get_transform_dict(name,df,X)) for name, df in X.groupby('Neighborhood')]
+        else:
+            dfs = [self.remove_neigh(df).fillna(value=self.get_transform_dict(name,df,X)) for name, df in X.groupby('Neighborhood')]
+        return pd.concat(dfs)
 
 
 class DFGetDummies(TransformerMixin):
@@ -109,7 +156,11 @@ class DFOutlierExtractor(TransformerMixin):
     def predict(self, X):
         return self.model.predict(X)
 
-
+class make_smart_column_selector():
+    def __init__(self,dtype_include):
+        self.dtype_include = dtype_include
+    def __call__(self,train):
+        return make_column_selector(dtype_include = self.dtype_include)(train)+['Neighborhood']
 
 from joblib import Memory
 cachedir = mkdtemp()
@@ -118,11 +169,11 @@ memory = Memory(cachedir, verbose=0)
 def densify(x): # needs to use a function, lambda gives problems with pickling
     return x.todense()
 
-def get_pipeline(model, scale=True,onehot=True,to_dense=False,remove_outliers=False, smart_imp=False):
+def get_pipeline(model, scale=True,onehot=True,to_dense=False,remove_outliers=False, smart_imp=False,zero_or_mean=False):
 
     cat_steps = []
-    if smart_imp: 
-        cat_steps.append(('impute_cat', DFSmartImputer()))
+    if False: 
+        cat_steps.append(('impute_cat', DFSmartImputer(strategy='most_frequent')))
     else:
         cat_steps.append(('impute_cat', DFSimpleImputer(strategy='most_frequent',fill_value='NaN')))
     if onehot: 
@@ -132,8 +183,10 @@ def get_pipeline(model, scale=True,onehot=True,to_dense=False,remove_outliers=Fa
     categorical_transformer = Pipeline(steps=cat_steps)
 
     num_steps = []
-    if False: 
-        num_steps.append(('impute_num', DFSmartImputer()))
+    if smart_imp: 
+        num_steps.append(('impute_num', DFSmartImputer(strategy='mean')))
+    elif zero_or_mean:
+        num_steps.append(('impute_num', DFZeroOrMeanImputer()))
     else:
         num_steps.append(('impute_num', DFSimpleImputer(strategy='mean')))
     if scale: num_steps.append(('scale_num', DFMinMaxScaler()))
