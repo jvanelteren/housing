@@ -19,6 +19,8 @@ from sklearn.ensemble import RandomForestRegressor,GradientBoostingRegressor,His
 from sklearn.impute import IterativeImputer
 from sklearn.compose import make_column_selector
 from tempfile import mkdtemp
+import random
+
 # todo multivariate imputation, possibly with pipelines for numeric and categorical data
 
 from sklearn.preprocessing import MinMaxScaler,StandardScaler,RobustScaler
@@ -36,7 +38,8 @@ import pandas as pd
 import numpy as np
 class DFSimpleImputer(SimpleImputer):
     def transform(self, X,y=None):
-        return pd.DataFrame(super().transform(X),columns=X.columns)
+        return pd.DataFrame(super().transform(X),columns=X.columns) 
+        # this approach creates problems with the add_indicator=True, since more columns are returned
 
 class DFZeroOrMeanImputer(TransformerMixin): # only for numeric features
     def fit(self, X, y=None):
@@ -60,6 +63,7 @@ class DFZeroOrMeanImputer(TransformerMixin): # only for numeric features
         return self
     
     def transform(self, X,y=None):
+        assert set(X.columns) == self.zero_cols | self.other_cols
         zero_trans, other_trans = pd.DataFrame(),pd.DataFrame(),
         if self.zero_cols: zero_trans = self.zero_imp.transform(X[self.zero_cols])
         if self.other_cols: other_trans = self.other_imp.transform(X[self.other_cols])
@@ -77,7 +81,7 @@ class DFSmartImputer(TransformerMixin): # will impute based on category Neighbor
         if all(X.dtypes=='category'): # categorical columns
             self.overall_imp = SimpleImputer(strategy=self.strategy).fit(X)
             self.specific_imps = {name: SimpleImputer(strategy=self.strategy).fit(df) for name, df in X.groupby('Neighborhood', sort=False)}
-        else:
+        else: # numerical columns
             self.overall_imp = SimpleImputer(strategy=self.strategy).fit(self.remove_neigh(X))
             self.specific_imps = {name: SimpleImputer(strategy=self.strategy).fit(self.remove_neigh(df)) for name, df in X.groupby('Neighborhood', sort=False)}
         
@@ -133,7 +137,7 @@ class DFColumnTransformer(ColumnTransformer):
 
 class DFOutlierExtractor(TransformerMixin):
 
-    def __init__(self, model, thres):
+    def __init__(self, model, thres=-1.5, contamination=None):
         """ 
         Keyword Args:
         neg_conf_val (float): The threshold for excluding samples with a lower
@@ -141,15 +145,22 @@ class DFOutlierExtractor(TransformerMixin):
         """
         self.model = model
         self.threshold = thres
+        self.contamination = contamination
+    def __repr__(self):
+        return f'DFOutlierExtractor with threshold {self.threshold}, contamination {self.contamination} and model {self.model}'
 
     def fit(self, X, y):
         xs = np.asarray(X)
         ys = np.asarray(y)
-        lcf = LocalOutlierFactor()
+        if self.contamination: 
+            lcf = LocalOutlierFactor(contamination=self.contamination)
+        else:
+            lcf = LocalOutlierFactor()
         lcf = lcf.fit(xs)
+        if self.contamination: self.threshold = lcf.offset_
         xs  = pd.DataFrame(xs[lcf.negative_outlier_factor_ > self.threshold, :],columns=X.columns)
         ys = y[lcf.negative_outlier_factor_ > self.threshold]
-        print('removed',len(X) - len(xs),self.threshold)
+        print('removed',len(X) - len(xs),self.threshold, 'thres',self.threshold)
         self.model.fit(xs,ys)
         return self
 
@@ -175,7 +186,7 @@ def get_pipeline(model, scale=True,onehot=True,to_dense=False,remove_outliers=Fa
     if False: 
         cat_steps.append(('impute_cat', DFSmartImputer(strategy='most_frequent')))
     else:
-        cat_steps.append(('impute_cat', DFSimpleImputer(strategy='most_frequent',fill_value='NaN')))
+        cat_steps.append(('impute_cat', DFSimpleImputer(strategy='constant',fill_value='NaN')))
     if onehot: 
         cat_steps.append(('cat_to_num', DFOneHotEncoder(handle_unknown="ignore")))
     else:
@@ -189,7 +200,7 @@ def get_pipeline(model, scale=True,onehot=True,to_dense=False,remove_outliers=Fa
         num_steps.append(('impute_num', DFZeroOrMeanImputer()))
     else:
         num_steps.append(('impute_num', DFSimpleImputer(strategy='mean')))
-    if scale: num_steps.append(('scale_num', DFMinMaxScaler()))
+    if scale: num_steps.append(('scale_num', DFStandardScaler()))
     numeric_transformer = Pipeline(steps=num_steps)
 
     col_trans = DFColumnTransformer(transformers=[
