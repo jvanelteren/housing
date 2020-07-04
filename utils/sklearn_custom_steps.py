@@ -135,9 +135,9 @@ class DFColumnTransformer(ColumnTransformer):
         # print('final shape',df.shape)
         return df.infer_objects()
 
-class DFOutlierExtractor(TransformerMixin):
+class DFOutlierExtractor(TransformerMixin,BaseEstimator):
 
-    def __init__(self, model, thres=-1.5, contamination=None):
+    def __init__(self, model, thres=-1.5, contamination=None,**kwargs):
         """ 
         Keyword Args:
         neg_conf_val (float): The threshold for excluding samples with a lower
@@ -146,6 +146,12 @@ class DFOutlierExtractor(TransformerMixin):
         self.model = model
         self.threshold = thres
         self.contamination = contamination
+        self._estimator_type = "regressor"
+        if kwargs:
+            for k,v in kwargs.items(): setattr(self.model,k,v)
+    def set_params(self,**kwargs):
+        self.model.set_params(**kwargs)
+
     def __repr__(self):
         return f'DFOutlierExtractor with threshold {self.threshold}, contamination {self.contamination} and model {self.model}'
 
@@ -180,13 +186,13 @@ memory = Memory(cachedir, verbose=0)
 def densify(x): # needs to use a function, lambda gives problems with pickling
     return x.todense()
 
-def get_pipeline(model, scale=True,onehot=True,to_dense=False,remove_outliers=False, smart_imp=False,zero_or_mean=False):
+def get_pipeline(model, scale=True,onehot=True,to_dense=False,remove_outliers=True, smart_imp=False,zero_or_mean=False):
 
     cat_steps = []
     if False: 
         cat_steps.append(('impute_cat', DFSmartImputer(strategy='most_frequent')))
     else:
-        cat_steps.append(('impute_cat', DFSimpleImputer(strategy='constant',fill_value='NaN')))
+        cat_steps.append(('impute_cat', DFSimpleImputer(strategy='most_frequent',fill_value='NaN')))
     if onehot: 
         cat_steps.append(('cat_to_num', DFOneHotEncoder(handle_unknown="ignore")))
     else:
@@ -209,12 +215,12 @@ def get_pipeline(model, scale=True,onehot=True,to_dense=False,remove_outliers=Fa
         ])
     
     preprocessor_steps = [('col_trans', col_trans)]
-    preprocessor = Pipeline(steps=preprocessor_steps)
+    preprocessor = Pipeline(steps=preprocessor_steps,memory=memory)
 
     final_pipe = [('preprocess', preprocessor)]
     if to_dense: final_pipe.append(('to_dense',FunctionTransformer(densify, accept_sparse=True)))
     if remove_outliers: 
-        final_pipe.append(('model',DFOutlierExtractor(model, thres=-1.5)))
+        final_pipe.append(('model',DFOutlierExtractor(model, corruption=0.005)))
     else:
         final_pipe.append(('model',model))
 

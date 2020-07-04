@@ -25,7 +25,7 @@ class AutoCatBoostRegressor(CatBoostRegressor):
         try:
             return not self._is_comparable_to(other) or self._object != other._object
         except:
-            return 0
+            return 1
 
 
 @dataclass
