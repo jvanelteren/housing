@@ -20,8 +20,9 @@ from sklearn.impute import IterativeImputer
 from sklearn.compose import make_column_selector
 from tempfile import mkdtemp
 import random
-
-# todo multivariate imputation, possibly with pipelines for numeric and categorical data
+from scipy.stats import skew, norm
+from scipy.special import boxcox1p
+from scipy.stats import boxcox_normmax
 
 from sklearn.preprocessing import MinMaxScaler,StandardScaler,RobustScaler
 # https://towardsdatascience.com/scale-standardize-or-normalize-with-scikit-learn-6ccc7d176a02
@@ -30,18 +31,24 @@ from sklearn.preprocessing import MinMaxScaler,StandardScaler,RobustScaler
 
 from sklearn.preprocessing import OneHotEncoder
 #https://stackoverflow.com/questions/36631163/what-are-the-pros-and-cons-between-get-dummies-pandas-and-onehotencoder-sciki
-#The crux of it is that the sklearn encoder creates a function which persists and can then be applied to new data sets which use the same categorical variables, with consistent results.
-# So don't use pandas get dummies, but a OneHotEncoder
+# The crux of it is that the sklearn encoder creates a function which persists and can then be applied to new data sets which use the same categorical variables, with consistent results.
 
 from catboost import CatBoostRegressor
 import pandas as pd
 import numpy as np
 class DFSimpleImputer(SimpleImputer):
+    # just like SimpleImputer, but retuns a df
+    # this approach creates problems with the add_indicator=True, since more columns are returned
+    # so don't set add_indicator to True
     def transform(self, X,y=None):
         return pd.DataFrame(super().transform(X),columns=X.columns) 
-        # this approach creates problems with the add_indicator=True, since more columns are returned
+    def __repr__(self):
+        return f'SimpleImputer'
 
-class DFZeroOrMeanImputer(TransformerMixin): # only for numeric features
+class DFZeroOrMeanImputer(TransformerMixin): 
+    # only for numeric features
+    # my try to set nan values to zero if a certain fraction is 0
+    # if not than impute with mean
     def fit(self, X, y=None):
         def determine_zero(series):
             perc_zero =  sum(series==0) / series.count()
@@ -68,8 +75,13 @@ class DFZeroOrMeanImputer(TransformerMixin): # only for numeric features
         if self.zero_cols: zero_trans = self.zero_imp.transform(X[self.zero_cols])
         if self.other_cols: other_trans = self.other_imp.transform(X[self.other_cols])
         return pd.concat([other_trans,zero_trans], axis=1)
+    def __repr__(self):
+        return f'ZeroOrMeanImputer'
 
-class DFSmartImputer(TransformerMixin): # will impute based on category Neighborhood
+class DFSmartImputer(TransformerMixin): 
+    # will impute based on category Neighborhood
+    # this sounded smart, but didn't generate good scores
+
     def __init__(self,strategy='most_frequent'):
         super().__init__()
         self.strategy = strategy
@@ -77,14 +89,12 @@ class DFSmartImputer(TransformerMixin): # will impute based on category Neighbor
     def remove_neigh(self,df):
         return df.drop(columns=['Neighborhood'])
     def fit(self,X, y=None):
-
         if all(X.dtypes=='category'): # categorical columns
             self.overall_imp = SimpleImputer(strategy=self.strategy).fit(X)
             self.specific_imps = {name: SimpleImputer(strategy=self.strategy).fit(df) for name, df in X.groupby('Neighborhood', sort=False)}
         else: # numerical columns
             self.overall_imp = SimpleImputer(strategy=self.strategy).fit(self.remove_neigh(X))
             self.specific_imps = {name: SimpleImputer(strategy=self.strategy).fit(self.remove_neigh(df)) for name, df in X.groupby('Neighborhood', sort=False)}
-        
         return self
     
     def get_transform_dict(self, name, df, X):
@@ -97,15 +107,44 @@ class DFSmartImputer(TransformerMixin): # will impute based on category Neighbor
         else:
             dfs = [self.remove_neigh(df).fillna(value=self.get_transform_dict(name,df,X)) for name, df in X.groupby('Neighborhood')]
         return pd.concat(dfs)
-
+    def __repr__(self):
+        return f'DFSmartImputer'
 
 class DFGetDummies(TransformerMixin):
+    # actually this should be identical to sklearn OneHotEncoder()
     def fit(self, X, y=None):
         self.train = pd.get_dummies(X)
         return self
     def transform(self, X, y=None):
         self.test = pd.get_dummies(X)
         return self.test.reindex(columns=self.train.columns,fill_value=0)
+    def __repr__(self):
+        return 'DFGetDummies'
+class DFUnSkewer(TransformerMixin):
+    # doesnt work with Standardscaler
+    def fit(self, X, y=None, verbose=False):
+        # Find skewed numerical features
+        self.train_x = X
+        self.verbose = verbose
+        skew_features = X.apply(lambda x: skew(x)).sort_values(ascending=False)
+        high_skew = skew_features[skew_features > 0.5]
+        self.skew_index = high_skew.index
+        if self.verbose: print("There are {} numerical features with Skew > 0.5 :".format(high_skew.shape[0]))
+        return self
+
+    def transform(self, X, y=None):
+        # Normalize skewed features
+        X_copy = X.copy()
+        try:
+            for i in self.skew_index:
+                X[i] = boxcox1p(X[i], boxcox_normmax(self.train_x[i] + 1))
+            return X
+        except Exception as e:
+            if self.verbose: print('error in unskewing (negative values?), skip this preprocessing step')
+            return X_copy
+
+    def __repr__(self):
+        return 'DFUnSkewer'
 
 class DFOneHotEncoder(OneHotEncoder):
     def transform(self, X,y=None):
@@ -114,17 +153,26 @@ class DFOneHotEncoder(OneHotEncoder):
         # print('OHE',arr.shape, self.get_feature_names().shape)
         return pd.DataFrame.sparse.from_spmatrix(arr,columns=self.get_feature_names())
         # return arr, self.get_feature_names()
+    def __repr__(self):
+        return 'DFOneHotEncoder'
 
 class DFMinMaxScaler(MinMaxScaler):
     def transform(self, X, y=None):
         return pd.DataFrame(super().transform(X),columns=X.columns)
+    def __repr__(self):
+        return 'DFMinMaxScaler'
 
 class DFStandardScaler(StandardScaler):
     def transform(self, X, y=None):
         return pd.DataFrame(super().transform(X),columns=X.columns)
+    def __repr__(self):
+        return 'DFStandardScaler'
+
 class DFRobustScaler(RobustScaler):
     def transform(self, X, y=None):
         return pd.DataFrame(super().transform(X),columns=X.columns)
+    def __repr__(self):
+        return 'DFRobustScaler'
 
 class DFColumnTransformer(ColumnTransformer):
     # works only with non-sparse matrices!
@@ -137,7 +185,7 @@ class DFColumnTransformer(ColumnTransformer):
 
 class DFOutlierExtractor(TransformerMixin,BaseEstimator):
 
-    def __init__(self, model, thres=-1.5, contamination=None,**kwargs):
+    def __init__(self, model, thres=-1.5, contamination=None, verbose=False, **kwargs):
         """ 
         Keyword Args:
         neg_conf_val (float): The threshold for excluding samples with a lower
@@ -146,14 +194,16 @@ class DFOutlierExtractor(TransformerMixin,BaseEstimator):
         self.model = model
         self.threshold = thres
         self.contamination = contamination
+        self.verbose = verbose
         self._estimator_type = "regressor"
         if kwargs:
             for k,v in kwargs.items(): setattr(self.model,k,v)
     def set_params(self,**kwargs):
+        if self.verbose: print('set params called',kwargs)
         self.model.set_params(**kwargs)
 
     def __repr__(self):
-        return f'DFOutlierExtractor with threshold {self.threshold}, contamination {self.contamination} and model {self.model}'
+        return f'DFOutlierExtractor thres {self.threshold}, cont {self.contamination}'
 
     def fit(self, X, y):
         xs = np.asarray(X)
@@ -166,7 +216,7 @@ class DFOutlierExtractor(TransformerMixin,BaseEstimator):
         if self.contamination: self.threshold = lcf.offset_
         xs  = pd.DataFrame(xs[lcf.negative_outlier_factor_ > self.threshold, :],columns=X.columns)
         ys = y[lcf.negative_outlier_factor_ > self.threshold]
-        print('removed',len(X) - len(xs),self.threshold, 'thres',self.threshold)
+        if self.verbose: print('removed',len(X) - len(xs),self.threshold, 'thres',self.threshold)
         self.model.fit(xs,ys)
         return self
 
@@ -183,20 +233,19 @@ from joblib import Memory
 cachedir = mkdtemp()
 memory = Memory(cachedir, verbose=0)
 
-def densify(x): # needs to use a function, lambda gives problems with pickling
-    return x.todense()
-
-def get_pipeline(model, scale=True,onehot=True,to_dense=False,remove_outliers=True, smart_imp=False,zero_or_mean=False):
+def get_pipeline(model, scale=True,onehot=True,to_dense=False,remove_outliers=False, smart_imp=False,zero_or_mean=False, unskew=False):
+    # in essence this splits the input into a categorical pipeline and a numeric pipeline
+    # merged with a ColumnTransformer
+    # on top a model is plugged (within OutlierExtractor if remove_outliers = True)
 
     cat_steps = []
     if False: 
         cat_steps.append(('impute_cat', DFSmartImputer(strategy='most_frequent')))
     else:
-        cat_steps.append(('impute_cat', DFSimpleImputer(strategy='most_frequent',fill_value='NaN')))
+        cat_steps.append(('impute_cat', DFSimpleImputer(strategy='constant',fill_value='None')))
     if onehot: 
-        cat_steps.append(('cat_to_num', DFOneHotEncoder(handle_unknown="ignore")))
-    else:
         cat_steps.append(('cat_to_num', DFGetDummies()))
+        # equal to: cat_steps.append(('cat_to_num', DFOneHotEncoder(handle_unknown="ignore")))
     categorical_transformer = Pipeline(steps=cat_steps)
 
     num_steps = []
@@ -207,6 +256,7 @@ def get_pipeline(model, scale=True,onehot=True,to_dense=False,remove_outliers=Tr
     else:
         num_steps.append(('impute_num', DFSimpleImputer(strategy='mean')))
     if scale: num_steps.append(('scale_num', DFStandardScaler()))
+    if unskew: num_steps.append(('unskew_num', DFUnSkewer()))
     numeric_transformer = Pipeline(steps=num_steps)
 
     col_trans = DFColumnTransformer(transformers=[
@@ -218,7 +268,6 @@ def get_pipeline(model, scale=True,onehot=True,to_dense=False,remove_outliers=Tr
     preprocessor = Pipeline(steps=preprocessor_steps,memory=memory)
 
     final_pipe = [('preprocess', preprocessor)]
-    if to_dense: final_pipe.append(('to_dense',FunctionTransformer(densify, accept_sparse=True)))
     if remove_outliers: 
         final_pipe.append(('model',DFOutlierExtractor(model, corruption=0.005)))
     else:

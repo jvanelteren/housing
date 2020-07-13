@@ -1,21 +1,8 @@
 
 
-
-
-
-
-doublecheck skewness and scaling
-
+fix cross validation with remove_outliers = True
  do imputation more specific per variable in pipeline step
 
 iets van een DOE met verschillende stappen van de pipeline en dan feature importance
 
-hele korte borutashap
 
-
-0.1109130
-model = test_model(xgb.XGBRegressor(learning_rate=0.01,n_estimators=3460,
-                                     max_depth=3, min_child_weight=0,
-                                     gamma=0, subsample=0.7,
-                                     colsample_bytree=0.7,seed=27,
-                                     reg_alpha=0.00006))

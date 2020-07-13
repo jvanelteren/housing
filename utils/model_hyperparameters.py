@@ -1,9 +1,13 @@
+# This file holds the hyperparameters for the different models
+# each model has a default model, a dict of hyperparameters and optional dictionary of steps to pass to the get_pipeline method
+# e.g. to exclude certain preprocessing steps
+
+
 from skopt.space import Real, Categorical, Integer
 from dataclasses import dataclass,field
 from sklearn.linear_model import LinearRegression, Ridge, RidgeCV, Lasso, LassoCV, ElasticNet,SGDRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.experimental import enable_hist_gradient_boosting
-
 from sklearn.ensemble import RandomForestRegressor,GradientBoostingRegressor,HistGradientBoostingRegressor
 from sklearn import svm
 from sklearn.neural_network import MLPRegressor
@@ -27,7 +31,6 @@ class AutoCatBoostRegressor(CatBoostRegressor):
         except:
             return 1
 
-
 @dataclass
 class Param:
      model: object = None
@@ -38,7 +41,7 @@ models = {
             'LinearRegression':Param(LinearRegression(),
                 {}),
 
-            'Lasso':Param(Lasso(),
+            'Lasso':Param(Lasso(alpha=0.0005304432735934807),
                 {'alpha':(0.00001,1.0,'log-uniform')}),
 
             'Ridge': Param(Ridge(),
@@ -66,7 +69,7 @@ models = {
             #fastai:
             #One of the most important properties of random forests is that they aren't very sensitive to the hyperparameter choices, such as max_features. You can set n_estimators to as high a number as you have time to train—the more trees you have, the more accurate the model will be. max_samples can often be left at its default, unless you have over 200,000 data points, in which case setting it to 200,000 will make it train faster with little impact on accuracy. max_features=0.5 and min_samples_leaf=4 both tend to work well, although sklearn's defaults work well too.
                 {'n_estimators' : (1,100, 'log-uniform'), # gamble
-                'max_depth' : (3, 40,'log-uniform'),
+                'max_depth' : (3, 10,'log-uniform'),
                 'max_features':Real(0.4,0.7,'uniform'),
                 'min_samples_leaf': Integer(3,8,'uniform')}),
 
@@ -99,7 +102,7 @@ models = {
                              min_child_weight=1.7817, n_estimators=2200,
                              reg_alpha=0.4640, reg_lambda=0.8571,
                              subsample=0.5213, random_state =7, nthread = -1, silent=True),
-                {'max_depth': Integer(2, 10,'log-uniform'), #9,12
+                {'max_depth': Integer(2, 8,'log-uniform'), #9,12
                 'min_child_weight': Integer(0, 4,'uniform'), # if leaves with small amount of observations are allowed?
                 'gamma' : Real(0,0.1), # these 3 for model complexity. gemma is a threshold for gain of the new split. 
                 'subsample': Real(0.6,1.0),
