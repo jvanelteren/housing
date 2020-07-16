@@ -1,8 +1,0 @@
-
-
-fix cross validation with remove_outliers = True
- do imputation more specific per variable in pipeline step
-
-iets van een DOE met verschillende stappen van de pipeline en dan feature importance
-
-

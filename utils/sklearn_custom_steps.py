@@ -7,7 +7,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.base import TransformerMixin,BaseEstimator, RegressorMixin
-from sklearn.preprocessing import MinMaxScaler,StandardScaler,RobustScaler
+from sklearn.preprocessing import MinMaxScaler,StandardScaler,RobustScaler, PowerTransformer
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.pipeline import Pipeline
 from sklearn import preprocessing
@@ -174,6 +174,12 @@ class DFRobustScaler(RobustScaler):
     def __repr__(self):
         return 'DFRobustScaler'
 
+class DFPowerTransformer(PowerTransformer):
+    def transform(self, X, y=None):
+        return pd.DataFrame(super().transform(X),columns=X.columns)
+    def __repr__(self):
+        return 'DFPowerTransformer'
+
 class DFColumnTransformer(ColumnTransformer):
     # works only with non-sparse matrices!
     def _hstack(self, Xs):
@@ -233,30 +239,35 @@ from joblib import Memory
 cachedir = mkdtemp()
 memory = Memory(cachedir, verbose=0)
 
-def get_pipeline(model, scale=True,onehot=True,to_dense=False,remove_outliers=False, smart_imp=False,zero_or_mean=False, unskew=False):
+def get_pipeline(model, impute_cat='default', impute_num = 'default', scale='default',onehot='default',remove_outliers='default'):
     # in essence this splits the input into a categorical pipeline and a numeric pipeline
     # merged with a ColumnTransformer
     # on top a model is plugged (within OutlierExtractor if remove_outliers = True)
 
     cat_steps = []
-    if False: 
-        cat_steps.append(('impute_cat', DFSmartImputer(strategy='most_frequent')))
-    else:
+    if impute_cat=='default':
         cat_steps.append(('impute_cat', DFSimpleImputer(strategy='constant',fill_value='None')))
-    if onehot: 
+    elif impute_cat:
+        cat_steps.append(('impute_cat', impute_cat))
+    
+    if onehot == 'default':
         cat_steps.append(('cat_to_num', DFGetDummies()))
+    elif onehot: 
+        cat_steps.append(('cat_to_num', onehot))
         # equal to: cat_steps.append(('cat_to_num', DFOneHotEncoder(handle_unknown="ignore")))
     categorical_transformer = Pipeline(steps=cat_steps)
 
     num_steps = []
-    if smart_imp: 
-        num_steps.append(('impute_num', DFSmartImputer(strategy='mean')))
-    elif zero_or_mean:
-        num_steps.append(('impute_num', DFZeroOrMeanImputer()))
-    else:
+    if impute_num == 'default':
         num_steps.append(('impute_num', DFSimpleImputer(strategy='mean')))
-    if scale: num_steps.append(('scale_num', DFStandardScaler()))
-    if unskew: num_steps.append(('unskew_num', DFUnSkewer()))
+    elif impute_num:
+        num_steps.append(('impute_num', impute_num))
+    
+    if scale == 'default': 
+        num_steps.append(('scale_num', DFStandardScaler()))
+    elif scale:
+        num_steps.append(('scale_num', scale))
+
     numeric_transformer = Pipeline(steps=num_steps)
 
     col_trans = DFColumnTransformer(transformers=[
@@ -268,10 +279,10 @@ def get_pipeline(model, scale=True,onehot=True,to_dense=False,remove_outliers=Fa
     preprocessor = Pipeline(steps=preprocessor_steps,memory=memory)
 
     final_pipe = [('preprocess', preprocessor)]
-    if remove_outliers: 
-        final_pipe.append(('model',DFOutlierExtractor(model, corruption=0.005)))
-    else:
+    if remove_outliers == 'default': 
         final_pipe.append(('model',model))
+    elif remove_outliers:
+        final_pipe.append(('model',remove_outliers)) # DFOutlierExtractor(model, corruption=0.005)
 
     return Pipeline(steps=final_pipe)
     

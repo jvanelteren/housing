@@ -16,6 +16,7 @@ import lightgbm as lgb
 import xgboost as xgb
 from catboost import CatBoostRegressor
 
+from utils.sklearn_custom_steps import DFSimpleImputer, DFOneHotEncoder,DFMinMaxScaler,DFColumnTransformer,DFOutlierExtractor,DFOutlierExtractor,DFStandardScaler,DFRobustScaler,DFSmartImputer, DFUnSkewer, DFPowerTransformer,DFSimpleImputer
 def hashing(self): return 8398398478478 
 CatBoostRegressor.__hash__ = hashing
 class AutoCatBoostRegressor(CatBoostRegressor):
@@ -42,7 +43,12 @@ models = {
                 {}),
 
             'Lasso':Param(Lasso(alpha=0.0005304432735934807),
-                {'alpha':(0.00001,1.0,'log-uniform')}),
+                {'alpha':(0.00001,1.0,'log-uniform')},
+            preprocess={
+                'impute_cat': DFSimpleImputer(strategy='most_frequent'), 
+                'impute_num' : DFSimpleImputer(strategy='median'),
+                'scale' : DFStandardScaler()}
+                ),
 
             'Ridge': Param(Ridge(),
                 {'alpha':(0.00001,1.0,'log-uniform')}),
@@ -50,7 +56,12 @@ models = {
             'ElasticNet':Param(ElasticNet(),
                 {'l1_ratio': Real(0.01, 1.0, 'log-uniform'),
                 'alpha':Real(0.0001, 1.0, 'log-uniform')
-                }),
+                },
+            preprocess={
+                'impute_cat': DFSimpleImputer(strategy='most_frequent'), 
+                'impute_num' : DFSimpleImputer(strategy='median'),
+                'scale' : DFStandardScaler()}
+                ),
             'svm.SVR': Param(svm.SVR(), 
                 # https://scikit-optimize.github.io/stable/auto_examples/sklearn-gridsearchcv-replacement.html#advanced-example
                 # https://scikit-learn.org/stable/modules/svm.html#regression
@@ -94,7 +105,10 @@ models = {
                 #  'border_count': Integer(1, 255),
                  'l2_leaf_reg': Integer(2, 6),
                  },
-            # preprocess={'onehot':False}
+            preprocess={
+                'impute_cat': DFSimpleImputer(strategy='constant',fill_value='None'), 
+                'impute_num' : DFSimpleImputer(strategy='mean'),
+                'scale' : DFMinMaxScaler()}
             ),
 
             'xgb.XGBRegressor':Param(xgb.XGBRegressor(colsample_bytree=0.4603, gamma=0.0468, 
@@ -111,7 +125,12 @@ models = {
                 'colsample_bylevel': Real(0.7,1.0,'log-uniform'),
                 'learning_rate': Real(0.001,0.4,'log-uniform'), # 0.3 is default
                 'max_delta_step': Real(0.0,10.0,'uniform'),
-                'n_estimators': Integer(10,4000,'log-uniform')}), # number of trees to build
+                'n_estimators': Integer(10,4000,'log-uniform')},
+            preprocess={
+                'impute_cat': DFSimpleImputer(strategy='most_frequent'), 
+                'impute_num' : DFSimpleImputer(strategy='most_frequent'),
+                'scale' : DFMinMaxScaler()}
+                ), # number of trees to build
             #https://www.kaggle.com/c/LANL-Earthquake-Prediction/discussion/89994
 
             'lgb.LGBMRegressor': Param(lgb.LGBMRegressor(objective='regression',num_leaves=5,
@@ -131,7 +150,11 @@ models = {
                 'bagging_fraction': Real(0.6, 0.95, 'log_uniform'),
                 'reg_alpha': Real(0.1, 0.95, 'log_uniform'),
                 'reg_lambda': Real(0.1, 0.95, 'log_uniform')
-            }),
+                },
+            preprocess={
+                'impute_cat': DFSimpleImputer(strategy='constant',fill_value='None'), 
+                'impute_num' : DFSimpleImputer(strategy='median'),
+                'scale' : DFRobustScaler()}),
 
             # A sparse matrix was passed, but dense data is required. Use X.toarray() to convert to a dense numpy array
             'HistGradientBoostingRegressor':Param(HistGradientBoostingRegressor(loss='least_absolute_deviation',max_iter=300),
@@ -152,8 +175,16 @@ models = {
             'KernelRidge':Param(KernelRidge(alpha=0.6, kernel='polynomial', degree=2, coef0=2.5),
                 {'alpha': Real(0.3,0.8,'log_uniform'),
                 'degree':Integer(1,3),
-                'coef0':Real(2.0,3.0)}),
+                'coef0':Real(2.0,3.0)},
+            preprocess={
+                'impute_cat': DFSimpleImputer(strategy='most_frequent'), 
+                'impute_num' : DFSimpleImputer(strategy='median'),
+                'scale' : DFStandardScaler()}
+                ),
                 
             'MLPRegressor':Param(MLPRegressor(),
                 {})
                 }
+
+ 
+            
