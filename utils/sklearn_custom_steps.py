@@ -145,6 +145,21 @@ class DFUnSkewer(TransformerMixin):
 
     def __repr__(self):
         return 'DFUnSkewer'
+class DFEmbeddingEncoder(TransformerMixin):
+    def transform(self, X,y=None):
+        # return super().transform(X)
+        import categorical_embedder as ce
+        embedding_info = ce.get_embedding_info(X)
+        X_encoded,encoders = ce.get_label_encoded_data(X)
+        embeddings = ce.get_embeddings(X_train, y_train, categorical_embedding_info=embedding_info, 
+                            is_classification=True, epochs=100,batch_size=256)
+        ce.fit_transform(X, embeddings=embeddings, encoders=encoders, drop_categorical_vars=True)
+
+    def __repr__(self):
+        return 'DFOneHotEncoder'
+
+
+
 
 class DFOneHotEncoder(OneHotEncoder):
     def transform(self, X,y=None):

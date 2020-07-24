@@ -117,11 +117,14 @@ models = {
                              reg_alpha=0.4640, reg_lambda=0.8571,
                              subsample=0.5213, random_state =7, nthread = -1, silent=True),
                 {'max_depth': Integer(2, 8,'log-uniform'), #9,12
-                'min_child_weight': Integer(0, 4,'uniform'), # if leaves with small amount of observations are allowed?
+                'min_child_weight': Integer(0, 4,'uniform'), # this is a Real instead of integer # if leaves with small amount of observations are allowed?
+                # 'min_child_weight': Real(0, 4,'uniform'), # this is a Real instead of integer # if leaves with small amount of observations are allowed?
                 'gamma' : Real(0,0.1), # these 3 for model complexity. gemma is a threshold for gain of the new split. 
-                'subsample': Real(0.6,1.0),
+                'subsample': Real(0.6,1.0), # (0.5,1)
+                # 'subsample': Real(0.5,1.0), 
                 'colsample_bytree' : Real(0.5,1.0,'log-uniform'), # these 3 for making model more robust to noise
                 'reg_lambda' : Real(0.0,0.9,'uniform'), # regularization lambda, reduces similarity scores and therefore lowers gain. reduces sensitivity to individual observations
+                # 'reg_alpha' : Real(0.3,0.8,'uniform'), # regularization lambda, reduces similarity scores and therefore lowers gain. reduces sensitivity to individual observations
                 'colsample_bylevel': Real(0.7,1.0,'log-uniform'),
                 'learning_rate': Real(0.001,0.4,'log-uniform'), # 0.3 is default
                 'max_delta_step': Real(0.0,10.0,'uniform'),
