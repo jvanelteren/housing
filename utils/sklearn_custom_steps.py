@@ -14,7 +14,6 @@ from sklearn import preprocessing
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import FunctionTransformer, OrdinalEncoder
 from sklearn.impute import SimpleImputer
-
 from sklearn.ensemble import RandomForestRegressor,GradientBoostingRegressor,HistGradientBoostingRegressor
 from sklearn.impute import IterativeImputer
 from sklearn.compose import make_column_selector
@@ -46,7 +45,7 @@ class DFSimpleImputer(SimpleImputer):
         return f'SimpleImputer'
 
 class DFZeroOrMeanImputer(TransformerMixin): 
-    # only for numeric features
+    # only for numeric features, was not successful
     # my try to set nan values to zero if a certain fraction is 0
     # if not than impute with mean
     def fit(self, X, y=None):
@@ -56,10 +55,8 @@ class DFZeroOrMeanImputer(TransformerMixin):
                 return True
             else: 
                 return False
-        
         self.zero_cols = set([c for c in X.columns if determine_zero(X[c])])
         self.other_cols = set(X.columns) - self.zero_cols
-        
         if self.zero_cols:
             self.zero_imp = DFSimpleImputer(strategy='constant', fill_value=0)
             self.zero_imp.fit(X[self.zero_cols])
@@ -81,7 +78,6 @@ class DFZeroOrMeanImputer(TransformerMixin):
 class DFSmartImputer(TransformerMixin): 
     # will impute based on category Neighborhood
     # this sounded smart, but didn't generate good scores
-
     def __init__(self,strategy='most_frequent'):
         super().__init__()
         self.strategy = strategy
@@ -110,6 +106,12 @@ class DFSmartImputer(TransformerMixin):
     def __repr__(self):
         return f'DFSmartImputer'
 
+class make_smart_column_selector():
+    def __init__(self,dtype_include):
+        self.dtype_include = dtype_include
+    def __call__(self,train):
+        return make_column_selector(dtype_include = self.dtype_include)(train)+['Neighborhood']
+
 class DFGetDummies(TransformerMixin):
     # actually this should be identical to sklearn OneHotEncoder()
     def fit(self, X, y=None):
@@ -120,46 +122,6 @@ class DFGetDummies(TransformerMixin):
         return self.test.reindex(columns=self.train.columns,fill_value=0)
     def __repr__(self):
         return 'DFGetDummies'
-class DFUnSkewer(TransformerMixin):
-    # doesnt work with Standardscaler
-    def fit(self, X, y=None, verbose=False):
-        # Find skewed numerical features
-        self.train_x = X
-        self.verbose = verbose
-        skew_features = X.apply(lambda x: skew(x)).sort_values(ascending=False)
-        high_skew = skew_features[skew_features > 0.5]
-        self.skew_index = high_skew.index
-        if self.verbose: print("There are {} numerical features with Skew > 0.5 :".format(high_skew.shape[0]))
-        return self
-
-    def transform(self, X, y=None):
-        # Normalize skewed features
-        X_copy = X.copy()
-        try:
-            for i in self.skew_index:
-                X[i] = boxcox1p(X[i], boxcox_normmax(self.train_x[i] + 1))
-            return X
-        except Exception as e:
-            if self.verbose: print('error in unskewing (negative values?), skip this preprocessing step')
-            return X_copy
-
-    def __repr__(self):
-        return 'DFUnSkewer'
-class DFEmbeddingEncoder(TransformerMixin):
-    def transform(self, X,y=None):
-        # return super().transform(X)
-        import categorical_embedder as ce
-        embedding_info = ce.get_embedding_info(X)
-        X_encoded,encoders = ce.get_label_encoded_data(X)
-        embeddings = ce.get_embeddings(X_train, y_train, categorical_embedding_info=embedding_info, 
-                            is_classification=True, epochs=100,batch_size=256)
-        ce.fit_transform(X, embeddings=embeddings, encoders=encoders, drop_categorical_vars=True)
-
-    def __repr__(self):
-        return 'DFOneHotEncoder'
-
-
-
 
 class DFOneHotEncoder(OneHotEncoder):
     def transform(self, X,y=None):
@@ -205,7 +167,7 @@ class DFColumnTransformer(ColumnTransformer):
         return df.infer_objects()
 
 class DFOutlierExtractor(TransformerMixin,BaseEstimator):
-
+    # automatically removes data from the dataset. Screws up CV and was not very successful.
     def __init__(self, model, thres=-1.5, contamination=None, verbose=False, **kwargs):
         """ 
         Keyword Args:
@@ -244,11 +206,6 @@ class DFOutlierExtractor(TransformerMixin,BaseEstimator):
     def predict(self, X):
         return self.model.predict(X)
 
-class make_smart_column_selector():
-    def __init__(self,dtype_include):
-        self.dtype_include = dtype_include
-    def __call__(self,train):
-        return make_column_selector(dtype_include = self.dtype_include)(train)+['Neighborhood']
 
 from joblib import Memory
 cachedir = mkdtemp()
@@ -258,6 +215,7 @@ def get_pipeline(model, impute_cat='default', impute_num = 'default', scale='def
     # in essence this splits the input into a categorical pipeline and a numeric pipeline
     # merged with a ColumnTransformer
     # on top a model is plugged (within OutlierExtractor if remove_outliers = True)
+    # this works very nicely!
 
     cat_steps = []
     if impute_cat=='default':

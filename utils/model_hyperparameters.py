@@ -1,7 +1,8 @@
 # This file holds the hyperparameters for the different models
-# each model has a default model, a dict of hyperparameters and optional dictionary of steps to pass to the get_pipeline method
-# e.g. to exclude certain preprocessing steps
-
+# each model is composed as a tuple of 'model_name', and a Param namedtuple, consisting of:
+# .model --> has a default model
+# .hyper --> a dict of hyperparameters
+# .preprocess --> optional dictionary of steps to pass to the get_pipeline method in sklearn_custom_steps
 
 from skopt.space import Real, Categorical, Integer
 from dataclasses import dataclass,field
@@ -15,15 +16,14 @@ from sklearn.kernel_ridge import KernelRidge
 import lightgbm as lgb
 import xgboost as xgb
 from catboost import CatBoostRegressor
-
 from utils.sklearn_custom_steps import DFSimpleImputer, DFOneHotEncoder,DFMinMaxScaler,DFColumnTransformer,DFOutlierExtractor,DFOutlierExtractor,DFStandardScaler,DFRobustScaler,DFSmartImputer, DFUnSkewer, DFPowerTransformer,DFSimpleImputer
 def hashing(self): return 8398398478478 
 CatBoostRegressor.__hash__ = hashing
+
 class AutoCatBoostRegressor(CatBoostRegressor):
+    # make catboost play nice with categorical features
     def fit(self,X,y,**kwargs):
         categorical = list(X.dtypes[(X.dtypes=='category' )| (X.dtypes=='object') | (X.dtypes=='O')].index)
-        # print(X.shape,len(categorical),categorical)
-        # print('kwarg',kwargs)
         res =  super().fit(X,y,cat_features=categorical,**kwargs)
         return res
     def __ne__(self, other):
@@ -42,7 +42,7 @@ models = {
             'LinearRegression':Param(LinearRegression(),
                 {}),
 
-            'Lasso':Param(Lasso(alpha=0.0005304432735934807),
+            'Lasso':Param(Lasso(alpha=0.0005304432735934807,random_state=112),
                 {'alpha':(0.00001,1.0,'log-uniform')},
             preprocess={
                 'impute_cat': DFSimpleImputer(strategy='most_frequent'), 
@@ -53,7 +53,7 @@ models = {
             'Ridge': Param(Ridge(),
                 {'alpha':(0.00001,1.0,'log-uniform')}),
 
-            'ElasticNet':Param(ElasticNet(),
+            'ElasticNet':Param(ElasticNet(random_state=112),
                 {'l1_ratio': Real(0.01, 1.0, 'log-uniform'),
                 'alpha':Real(0.0001, 1.0, 'log-uniform')
                 },
@@ -62,6 +62,7 @@ models = {
                 'impute_num' : DFSimpleImputer(strategy='median'),
                 'scale' : DFStandardScaler()}
                 ),
+
             'svm.SVR': Param(svm.SVR(), 
                 # https://scikit-optimize.github.io/stable/auto_examples/sklearn-gridsearchcv-replacement.html#advanced-example
                 # https://scikit-learn.org/stable/modules/svm.html#regression
@@ -76,7 +77,6 @@ models = {
                 'weights': ['uniform','distance']}),
 
             'RandomForestRegressor':Param(RandomForestRegressor(),
-            #
             #fastai:
             #One of the most important properties of random forests is that they aren't very sensitive to the hyperparameter choices, such as max_features. You can set n_estimators to as high a number as you have time to train—the more trees you have, the more accurate the model will be. max_samples can often be left at its default, unless you have over 200,000 data points, in which case setting it to 200,000 will make it train faster with little impact on accuracy. max_features=0.5 and min_samples_leaf=4 both tend to work well, although sklearn's defaults work well too.
                 {'n_estimators' : (1,100, 'log-uniform'), # gamble
@@ -93,8 +93,7 @@ models = {
             #     'class_weight' : [{1:0.5, 0:0.5}, {1:0.4, 0:0.6}, {1:0.6, 0:0.4}, {1:0.7, 0:0.3}],
             #     'eta0' : [1, 10, 100]}),
 
-            # Catboost does not work atm with bayessearch. Tried to define __hash__, but then got into problems with is_comparable
-            'AutoCatBoostRegressor':Param(AutoCatBoostRegressor(silent=True,iterations = 1000),
+            'AutoCatBoostRegressor':Param(AutoCatBoostRegressor(silent=True,iterations = 1000, random_seed =112),
                 {
                 # 'iterations': Integer(350,350),
                  'depth': Integer(4, 7),
@@ -115,7 +114,7 @@ models = {
                              learning_rate=0.05, max_depth=3, 
                              min_child_weight=1.7817, n_estimators=2200,
                              reg_alpha=0.4640, reg_lambda=0.8571,
-                             subsample=0.5213, random_state =7, nthread = -1, silent=True),
+                             subsample=0.5213, random_state =112, nthread = -1, silent=True),
                 {'max_depth': Integer(2, 8,'log-uniform'), #9,12
                 'min_child_weight': Integer(0, 4,'uniform'), # this is a Real instead of integer # if leaves with small amount of observations are allowed?
                 # 'min_child_weight': Real(0, 4,'uniform'), # this is a Real instead of integer # if leaves with small amount of observations are allowed?
@@ -141,7 +140,7 @@ models = {
                               max_bin = 55, bagging_fraction = 0.8,
                               bagging_freq = 5, feature_fraction = 0.2319,
                               feature_fraction_seed=9, bagging_seed=9,
-                              min_data_in_leaf =6, min_sum_hessian_in_leaf = 11),
+                              min_data_in_leaf =6, min_sum_hessian_in_leaf = 11,random_seed=112),
                         # num_leaves=31,
                         # learning_rate=0.05,
                         # n_estimators=20,
@@ -162,6 +161,7 @@ models = {
             # A sparse matrix was passed, but dense data is required. Use X.toarray() to convert to a dense numpy array
             'HistGradientBoostingRegressor':Param(HistGradientBoostingRegressor(loss='least_absolute_deviation',max_iter=300),
                 {}),
+
             'GradientBoostingRegressor': Param(GradientBoostingRegressor(n_estimators=2000, learning_rate=0.05,
                                    max_depth=4, max_features='sqrt',
                                    min_samples_leaf=5, min_samples_split=12, random_state =5,loss='huber'),
@@ -175,6 +175,7 @@ models = {
 
             'LassoCV':Param(LassoCV(),
                 {}),
+
             'KernelRidge':Param(KernelRidge(alpha=0.6, kernel='polynomial', degree=2, coef0=2.5),
                 {'alpha': Real(0.3,0.8,'log_uniform'),
                 'degree':Integer(1,3),
