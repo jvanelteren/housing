@@ -6,7 +6,7 @@
 
 from skopt.space import Real, Categorical, Integer
 from dataclasses import dataclass,field
-from sklearn.linear_model import LinearRegression, Ridge, RidgeCV, Lasso, LassoCV, ElasticNet,SGDRegressor
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, LassoCV, ElasticNet,SGDRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.experimental import enable_hist_gradient_boosting
 from sklearn.ensemble import RandomForestRegressor,GradientBoostingRegressor,HistGradientBoostingRegressor
@@ -16,7 +16,7 @@ from sklearn.kernel_ridge import KernelRidge
 import lightgbm as lgb
 import xgboost as xgb
 from catboost import CatBoostRegressor
-from utils.sklearn_custom_steps import DFSimpleImputer, DFOneHotEncoder,DFMinMaxScaler,DFColumnTransformer,DFOutlierExtractor,DFOutlierExtractor,DFStandardScaler,DFRobustScaler,DFSmartImputer, DFUnSkewer, DFPowerTransformer,DFSimpleImputer
+from utils.sklearn_custom_steps import DFSimpleImputer,DFMinMaxScaler,DFStandardScaler,DFRobustScaler,DFSimpleImputer
 def hashing(self): return 8398398478478 
 CatBoostRegressor.__hash__ = hashing
 
@@ -47,7 +47,7 @@ models = {
             preprocess={
                 'impute_cat': DFSimpleImputer(strategy='most_frequent'), 
                 'impute_num' : DFSimpleImputer(strategy='median'),
-                'scale' : DFStandardScaler()}
+                'scale' : DFRobustScaler()}
                 ),
 
             'Ridge': Param(Ridge(),
@@ -58,8 +58,8 @@ models = {
                 'alpha':Real(0.0001, 1.0, 'log-uniform')
                 },
             preprocess={
-                'impute_cat': DFSimpleImputer(strategy='most_frequent'), 
-                'impute_num' : DFSimpleImputer(strategy='median'),
+                'impute_cat': DFSimpleImputer(strategy='constant', fill_value='Unknown'), 
+                'impute_num' : DFSimpleImputer(strategy='mean'),
                 'scale' : DFStandardScaler()}
                 ),
 
@@ -93,7 +93,7 @@ models = {
             #     'class_weight' : [{1:0.5, 0:0.5}, {1:0.4, 0:0.6}, {1:0.6, 0:0.4}, {1:0.7, 0:0.3}],
             #     'eta0' : [1, 10, 100]}),
 
-            'AutoCatBoostRegressor':Param(AutoCatBoostRegressor(silent=True,iterations = 1000, random_seed =112),
+            'AutoCatBoostRegressor':Param(AutoCatBoostRegressor(silent=True,iterations = 1000, random_state =112),
                 {
                 # 'iterations': Integer(350,350),
                  'depth': Integer(4, 7),
@@ -105,9 +105,9 @@ models = {
                  'l2_leaf_reg': Integer(2, 6),
                  },
             preprocess={
-                'impute_cat': DFSimpleImputer(strategy='constant',fill_value='None'), 
-                'impute_num' : DFSimpleImputer(strategy='mean'),
-                'scale' : DFMinMaxScaler()}
+                'impute_cat': DFSimpleImputer(strategy='constant',fill_value='Unknown'), 
+                'impute_num' : DFSimpleImputer(strategy='median'),
+                'scale' : DFRobustScaler()}
             ),
 
             'xgb.XGBRegressor':Param(xgb.XGBRegressor(colsample_bytree=0.4603, gamma=0.0468, 
@@ -131,7 +131,7 @@ models = {
             preprocess={
                 'impute_cat': DFSimpleImputer(strategy='most_frequent'), 
                 'impute_num' : DFSimpleImputer(strategy='most_frequent'),
-                'scale' : DFMinMaxScaler()}
+                'scale' : DFRobustScaler()}
                 ), # number of trees to build
             #https://www.kaggle.com/c/LANL-Earthquake-Prediction/discussion/89994
 
@@ -140,7 +140,7 @@ models = {
                               max_bin = 55, bagging_fraction = 0.8,
                               bagging_freq = 5, feature_fraction = 0.2319,
                               feature_fraction_seed=9, bagging_seed=9,
-                              min_data_in_leaf =6, min_sum_hessian_in_leaf = 11,random_seed=112),
+                              min_data_in_leaf =6, min_sum_hessian_in_leaf = 11,random_state=112),
                         # num_leaves=31,
                         # learning_rate=0.05,
                         # n_estimators=20,
