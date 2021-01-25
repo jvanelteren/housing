@@ -11,7 +11,6 @@ from sklearn.preprocessing import MinMaxScaler,StandardScaler,RobustScaler, Powe
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.pipeline import Pipeline
 from sklearn import preprocessing
-from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import FunctionTransformer, OrdinalEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.ensemble import RandomForestRegressor,GradientBoostingRegressor,HistGradientBoostingRegressor
